@@ -107,6 +107,13 @@
 
 #include <asm/paravirt.h>
 #include <asm/hypervisor.h>
+#include <asm/io_apic.h>
+#include <asm/kasan.h>
+#include <asm/kaslr.h>
+#include <asm/kexec.h>
+#include <asm/mce.h>
+#include <asm/mtrr.h>
+#include <asm/realmode.h>
 #include <asm/olpc_ofw.h>
 
 #include <asm/percpu.h>
@@ -443,6 +450,7 @@ static void __init memblock_x86_reserve_range_setup_data(void)
 	}
 }
 
+<<<<<<< HEAD
 /*
  * --------- Crashkernel reservation ------------------------------
  */
@@ -604,6 +612,9 @@ static void __init reserve_crashkernel(void)
 	insert_resource(&iomem_resource, &crashk_res);
 }
 #else
+=======
+#ifndef CONFIG_KEXEC_CORE
+>>>>>>> 364cdc25f77d... x86: kdump: move reserve_crashkernel[_low]() into crash_core.c
 static void __init reserve_crashkernel(void)
 {
 }
