@@ -2995,17 +2995,16 @@ static int module_sig_check(struct load_info *info, int flags)
 		 * enforcing, certain errors are non-fatal.
 		 */
 	case -ENODATA:
-		reason = "unsigned module";
+		reason = "Loading of unsigned module";
 		goto decide;
 	case -ENOPKG:
-		reason = "module with unsupported crypto";
+		reason = "Loading of module with unsupported crypto";
 		goto decide;
 	case -ENOKEY:
-		reason = "module with unavailable key";
+		reason = "Loading of module with unavailable key";
 	decide:
 		if (is_module_sig_enforced()) {
-			pr_notice("%s: loading of %s is rejected\n",
-				  info->name, reason);
+			pr_notice("%s: %s is rejected\n", info->name, reason);
 			return -EKEYREJECTED;
 		}
 
