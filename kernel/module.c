@@ -2996,13 +2996,20 @@ static int module_sig_check(struct load_info *info, int flags)
 		 */
 	case -ENODATA:
 		reason = "unsigned module";
-		break;
+		goto decide;
 	case -ENOPKG:
 		reason = "module with unsupported crypto";
-		break;
+		goto decide;
 	case -ENOKEY:
 		reason = "module with unavailable key";
-		break;
+	decide:
+		if (is_module_sig_enforced()) {
+			pr_notice("%s: loading of %s is rejected\n",
+				  info->name, reason);
+			return -EKEYREJECTED;
+		}
+
+		return security_locked_down(LOCKDOWN_MODULE_SIGNATURE);
 
 		/* All other errors are fatal, including nomem, unparseable
 		 * signatures and signature check failures - even if signatures
@@ -3011,13 +3018,6 @@ static int module_sig_check(struct load_info *info, int flags)
 	default:
 		return err;
 	}
-
-	if (is_module_sig_enforced()) {
-		pr_notice("%s: loading of %s is rejected\n", info->name, reason);
-		return -EKEYREJECTED;
-	}
-
-	return security_locked_down(LOCKDOWN_MODULE_SIGNATURE);
 }
 #else /* !CONFIG_MODULE_SIG */
 static int module_sig_check(struct load_info *info, int flags)
