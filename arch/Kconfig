@@ -73,6 +73,7 @@ config KPROBES
 
 config JUMP_LABEL
        bool "Optimize very unlikely/likely branches"
+       default y
        depends on HAVE_ARCH_JUMP_LABEL
        depends on CC_HAS_ASM_GOTO
        help
@@ -405,9 +406,11 @@ config HAVE_PERF_USER_STACK_DUMP
 
 config HAVE_ARCH_JUMP_LABEL
 	bool
+	default y
 
 config HAVE_ARCH_JUMP_LABEL_RELATIVE
 	bool
+	default y
 
 config HAVE_RCU_TABLE_FREE
 	bool
