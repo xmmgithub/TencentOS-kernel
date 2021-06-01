@@ -76,7 +76,8 @@ kbdir=$1; shift
 buildroot=$1; shift
 
 # Path to full mlnx_ofed package
-ofedsrc=${kbdir}/package/arm/mlx/MLNX_OFED_LINUX-5.1-2.5.8.0.46-rhel8.3-aarch64.tgz
+#ofedsrc=${kbdir}/package/arm/mlx/MLNX_OFED_LINUX-5.1-2.5.8.0.46-rhel8.3-aarch64.tgz
+ofedsrc=${kbdir}/package/arm/mlx/MLNX_OFED_LINUX-5.2-2.2.3.0-rhel8.3-aarch64.tgz
 
 mlx_splits_dir=${kbdir}/package/arm/mlx
 mlx_splits="mlx_split*"
