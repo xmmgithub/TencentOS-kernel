@@ -4,6 +4,8 @@
  * Copyright (c) 2011-2014, Intel Corporation.
  */
 
+#include <asm/cputype.h>
+#include <linux/irq.h>
 #include <linux/aer.h>
 #include <linux/async.h>
 #include <linux/blkdev.h>
@@ -39,6 +41,14 @@
  */
 #define NVME_MAX_KB_SZ	4096
 #define NVME_MAX_SEGS	127
+
+#define NUMA_NODE8 8
+#define CPUS_PER_SOCKET   64
+
+#define ARM_CPU_IMP_PHYTIUM 0x70
+#define PHYTIUM_CPU_PART_2500   0x663
+
+#define MIDR_FT_2500 MIDR_CPU_MODEL(ARM_CPU_IMP_PHYTIUM, PHYTIUM_CPU_PART_2500)
 
 static int use_threaded_interrupts;
 module_param(use_threaded_interrupts, int, 0);
@@ -1674,6 +1684,31 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid, bool polled)
 		result = queue_request_irq(nvmeq);
 		if (result < 0)
 			goto release_sq;
+	}
+
+	/*
+	 * Fixed the FT2500 problem that interrupts are concentrated in one cpu.
+	 */
+	if ((read_cpuid_id() & MIDR_CPU_MODEL_MASK) == MIDR_FT_2500) {
+		int cpu;
+		cpumask_var_t new_value;
+
+		struct pci_dev *pdev = to_pci_dev(dev->dev);
+		int irq = pci_irq_vector(pdev, nvmeq->cq_vector);
+
+		/*
+		 * If device on socket 1 then set affinity cpumask from 64 to 127.
+		 * Else device on socket 0 and set affinity cpumask from 0 to 63.
+		 */
+		if (dev_to_node(dev->dev) == NUMA_NODE8)
+			cpu = CPUS_PER_SOCKET + (qid - 1) % CPUS_PER_SOCKET;
+		else
+			cpu = (qid - 1) % CPUS_PER_SOCKET;
+
+		cpumask_clear(new_value);
+		cpumask_set_cpu(cpu, new_value);
+
+		irq_set_affinity_hint(irq, new_value);
 	}
 
 	set_bit(NVMEQ_ENABLED, &nvmeq->flags);
