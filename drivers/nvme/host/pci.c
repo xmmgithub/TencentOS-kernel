@@ -4,8 +4,10 @@
  * Copyright (c) 2011-2014, Intel Corporation.
  */
 
+#ifdef CONFIG_ARM_GIC_PHYTIUM_2500
 #include <asm/cputype.h>
 #include <linux/irq.h>
+#endif
 #include <linux/aer.h>
 #include <linux/async.h>
 #include <linux/blkdev.h>
@@ -42,6 +44,7 @@
 #define NVME_MAX_KB_SZ	4096
 #define NVME_MAX_SEGS	127
 
+#ifdef CONFIG_ARM_GIC_PHYTIUM_2500
 #define NUMA_NODE8 8
 #define CPUS_PER_SOCKET   64
 
@@ -49,6 +52,7 @@
 #define PHYTIUM_CPU_PART_2500   0x663
 
 #define MIDR_FT_2500 MIDR_CPU_MODEL(ARM_CPU_IMP_PHYTIUM, PHYTIUM_CPU_PART_2500)
+#endif
 
 static int use_threaded_interrupts;
 module_param(use_threaded_interrupts, int, 0);
@@ -1685,7 +1689,7 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid, bool polled)
 		if (result < 0)
 			goto release_sq;
 	}
-
+#ifdef CONFIG_ARM_GIC_PHYTIUM_2500
 	/*
 	 * Fixed the FT2500 problem that interrupts are concentrated in one cpu.
 	 */
@@ -1710,7 +1714,7 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid, bool polled)
 
 		irq_set_affinity_hint(irq, new_value);
 	}
-
+#endif
 	set_bit(NVMEQ_ENABLED, &nvmeq->flags);
 	return result;
 
