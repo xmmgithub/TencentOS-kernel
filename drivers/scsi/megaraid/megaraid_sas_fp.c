@@ -1,10 +1,22 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  Linux MegaRAID driver for SAS based RAID controllers
  *
- *  Copyright (c) 2009-2013  LSI Corporation
- *  Copyright (c) 2013-2016  Avago Technologies
- *  Copyright (c) 2016-2018  Broadcom Inc.
+ *  Copyright (c) 2009-2018  LSI Corporation.
+ *  Copyright (c) 2009-2018  Avago Technologies.
+ *  Copyright (c) 2009-2018  Broadcom Inc.
+ *
+ *  This program is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either version 2
+ *  of the License, or (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  *  FILE: megaraid_sas_fp.c
  *
@@ -18,6 +30,7 @@
  *  Send feedback to: megaraidlinux.pdl@broadcom.com
  */
 
+#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -33,7 +46,6 @@
 #include <linux/compat.h>
 #include <linux/blkdev.h>
 #include <linux/poll.h>
-#include <linux/irq_poll.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -350,6 +362,9 @@ u8 MR_ValidateMapInfo(struct megasas_instance *instance, u64 map_id)
 
 	num_lds = le16_to_cpu(drv_map->raidMap.ldCount);
 
+	memcpy(instance->ld_ids_prev, instance->ld_ids_from_raidmap,
+			sizeof(instance->ld_ids_from_raidmap));
+	memset(instance->ld_ids_from_raidmap, 0xff, MEGASAS_MAX_LD_IDS);
 	/*Convert Raid capability values to CPU arch */
 	for (i = 0; (num_lds > 0) && (i < MAX_LOGICAL_DRIVES_EXT); i++) {
 		ld = MR_TargetIdToLdGet(i, drv_map);
@@ -360,7 +375,7 @@ u8 MR_ValidateMapInfo(struct megasas_instance *instance, u64 map_id)
 
 		raid = MR_LdRaidGet(ld, drv_map);
 		le32_to_cpus((u32 *)&raid->capability);
-
+		instance->ld_ids_from_raidmap[i] = i;
 		num_lds--;
 	}
 
@@ -939,7 +954,7 @@ static void mr_get_phy_params_r56_rmw(struct megasas_instance *instance,
 
 		if (PParityArm < 0)
 			PParityArm += arms;
-
+		
 		/* rightmostParityArm is P-Parity for RAID 5 and Q-Parity for RAID */
 		pRAID_Context->flow_specific.r56_arm_map = rightmostParityArm;
 		pRAID_Context->flow_specific.r56_arm_map |=
@@ -959,6 +974,7 @@ static void mr_get_phy_params_r56_rmw(struct megasas_instance *instance,
 
 	return;
 }
+
 
 /*
 ******************************************************************************
@@ -1023,10 +1039,11 @@ MR_BuildRaidContext(struct megasas_instance *instance,
 		}
 	}
 
+	io_info->data_arms = raid->rowDataSize;
+
 	stripSize = 1 << raid->stripeShift;
 	stripe_mask = stripSize-1;
 
-	io_info->data_arms = raid->rowDataSize;
 
 	/*
 	 * calculate starting row and stripe, and number of strips and rows
