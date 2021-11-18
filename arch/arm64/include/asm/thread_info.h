@@ -41,6 +41,9 @@ struct thread_info {
 #endif
 		} preempt;
 	};
+#ifdef CONFIG_EXAGEAR_BT
+       int                     exagear_syscall;  /* exagear 32-bit syscall */
+#endif
 };
 
 #define thread_saved_pc(tsk)	\

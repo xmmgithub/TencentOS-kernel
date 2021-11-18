@@ -324,7 +324,7 @@ unsigned long randomize_stack_top(unsigned long stack_top)
 unsigned long arch_randomize_brk(struct mm_struct *mm)
 {
 	/* Is the current task 32bit ? */
-	if (!IS_ENABLED(CONFIG_64BIT) || is_compat_task())
+	if (!IS_ENABLED(CONFIG_64BIT) || is_aarch32_compat_task())
 		return randomize_page(mm->brk, SZ_32M);
 
 	return randomize_page(mm->brk, SZ_1G);
@@ -383,19 +383,64 @@ static unsigned long mmap_base(unsigned long rnd, struct rlimit *rlim_stack)
 	return PAGE_ALIGN(STACK_TOP - gap - rnd);
 }
 
+#ifdef CONFIG_EXAGEAR_BT
+/* Definitions for Exagear's guest mmap area */
+#define EXAGEAR_STACK_TOP			0xffff0000
+#define EXAGEAR_MAX_GAP			(EXAGEAR_STACK_TOP/6*5)
+#define EXAGEAR_TASK_UNMAPPED_BASE	PAGE_ALIGN(TASK_SIZE_32 / 4)
+#endif
+
+#ifdef CONFIG_EXAGEAR_BT
+static unsigned long exagear_mmap_base(unsigned long rnd)
+{
+	unsigned long gap = rlimit(RLIMIT_STACK);
+
+	if (gap < MIN_GAP)
+		gap = MIN_GAP;
+	else if (gap > EXAGEAR_MAX_GAP)
+		gap = EXAGEAR_MAX_GAP;
+
+	return PAGE_ALIGN(EXAGEAR_STACK_TOP - gap - rnd);
+}
+#endif
+
+/*
+ *  * This function, called very early during the creation of a new process VM
+ *   * image, sets up which VM layout function to use:
+ *    */
 void arch_pick_mmap_layout(struct mm_struct *mm, struct rlimit *rlim_stack)
 {
 	unsigned long random_factor = 0UL;
+#ifdef CONFIG_EXAGEAR_BT
+	unsigned long exagear_random_factor = 0UL;
+#endif
 
-	if (current->flags & PF_RANDOMIZE)
+	if (current->flags & PF_RANDOMIZE) {
 		random_factor = arch_mmap_rnd();
+#ifdef CONFIG_EXAGEAR_BT
+		exagear_random_factor = (get_random_long() &
+			((1UL << mmap_rnd_compat_bits) - 1)) << PAGE_SHIFT;
+#endif
 
+	}
+
+	/*
+ * 	 * Fall back to the standard layout if the personality bit is set, or
+ * 	 	 * if the expected stack growth is unlimited:
+ * 	 	 	 */
 	if (mmap_is_legacy(rlim_stack)) {
 		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
 		mm->get_unmapped_area = arch_get_unmapped_area;
+#ifdef CONFIG_EXAGEAR_BT
+		mm->context.exagear_mmap_base = EXAGEAR_TASK_UNMAPPED_BASE +
+			exagear_random_factor;
+#endif
 	} else {
 		mm->mmap_base = mmap_base(random_factor, rlim_stack);
 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
+#ifdef CONFIG_EXAGEAR_BT
+		mm->context.exagear_mmap_base = exagear_mmap_base(exagear_random_factor);
+#endif
 	}
 }
 #elif defined(CONFIG_MMU) && !defined(HAVE_ARCH_PICK_MMAP_LAYOUT)

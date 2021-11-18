@@ -35,6 +35,9 @@ int main(void)
   DEFINE(TSK_TI_TTBR0,		offsetof(struct task_struct, thread_info.ttbr0));
 #endif
   DEFINE(TSK_STACK,		offsetof(struct task_struct, stack));
+#ifdef CONFIG_EXAGEAR_BT
+  DEFINE(TI_EXAGEAR_SYSCALL,     offsetof(struct task_struct, thread_info.exagear_syscall));
+#endif
 #ifdef CONFIG_STACKPROTECTOR
   DEFINE(TSK_STACK_CANARY,	offsetof(struct task_struct, stack_canary));
 #endif

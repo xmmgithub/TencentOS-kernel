@@ -199,10 +199,35 @@ struct compat_shmid64_ds {
 
 static inline int is_compat_task(void)
 {
+#ifdef CONFIG_EXAGEAR_BT
+       return current_thread_info()->exagear_syscall || test_thread_flag(TIF_32BIT);
+#else
+       return test_thread_flag(TIF_32BIT);
+#endif
+}
+
+static inline int is_aarch32_compat_task(void)
+{
 	return test_thread_flag(TIF_32BIT);
 }
 
+#ifdef CONFIG_EXAGEAR_BT
+static inline int is_exagear_compat_task(void)
+{
+       return current_thread_info()->exagear_syscall;
+}
+#endif
+
 static inline int is_compat_thread(struct thread_info *thread)
+{
+#ifdef CONFIG_EXAGEAR_BT
+	return current_thread_info()->exagear_syscall || test_ti_thread_flag(thread, TIF_32BIT);
+#else
+	return test_ti_thread_flag(thread, TIF_32BIT);
+#endif
+}
+
+static inline int is_aarch32_compat_thread(struct thread_info *thread)
 {
 	return test_ti_thread_flag(thread, TIF_32BIT);
 }

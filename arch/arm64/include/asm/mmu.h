@@ -20,6 +20,9 @@ typedef struct {
 	atomic64_t	id;
 	void		*vdso;
 	unsigned long	flags;
+#ifdef CONFIG_EXAGEAR_BT
+       unsigned long   exagear_mmap_base;
+#endif
 } mm_context_t;
 
 /*
