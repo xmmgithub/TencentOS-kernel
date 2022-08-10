@@ -68,6 +68,7 @@ source "net/iucv/Kconfig"
 source "net/smc/Kconfig"
 source "net/xdp/Kconfig"
 source "net/toa/Kconfig"
+source "net/mptcp/Kconfig"
 
 config INET
 	bool "TCP/IP networking"
@@ -451,6 +452,18 @@ config FAILOVER
 	  VF as an accelerated low latency datapath. It also allows live
 	  migration of VMs with direct attached VFs by failing over to the
 	  paravirtual datapath when the VF is unplugged.
+
+config MPTCP
+	bool "MPTCP: Multipath TCP"
+	depends on INET
+	select SKB_EXTENSIONS
+	select CRYPTO_LIB_SHA256
+	select CRYPTO
+	help
+	  Multipath TCP (MPTCP) connections send and receive data over multiple
+	  subflows in order to utilize multiple network paths. Each subflow
+	  uses the TCP protocol, and TCP options carry header information for
+	  MPTCP.
 
 endif   # if NET
 
