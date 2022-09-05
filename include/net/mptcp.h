@@ -61,6 +61,7 @@ struct mptcp_out_options {
 extern struct request_sock_ops mptcp_subflow_request_sock_ops;
 
 void mptcp_init(void);
+extern int mptcp_tcp_enabled(const struct net *net);
 
 static inline bool sk_is_mptcp(const struct sock *sk)
 {
@@ -104,6 +105,17 @@ static inline void mptcp_skb_ext_move(struct sk_buff *to,
 	to->active_extensions = from->active_extensions;
 	to->extensions = from->extensions;
 	from->active_extensions = 0;
+}
+
+static inline bool mptcp_convert_tcp(struct net *net, int kern, int family,
+				     int type, int protocol)
+{
+	if (!kern && (family == PF_INET || family == PF_INET6) &&
+	    type == SOCK_STREAM &&
+	    (protocol == IPPROTO_TCP || protocol == IPPROTO_IP) &&
+	    mptcp_tcp_enabled(net))
+		return true;
+	return false;
 }
 
 static inline bool mptcp_ext_matches(const struct mptcp_ext *to_ext,

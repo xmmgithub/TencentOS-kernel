@@ -93,6 +93,7 @@
 #include <net/compat.h>
 #include <net/wext.h>
 #include <net/cls_cgroup.h>
+#include <net/mptcp.h>
 
 #include <net/sock.h>
 #include <linux/netfilter.h>
@@ -1422,6 +1423,9 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 			     current->comm);
 		family = PF_PACKET;
 	}
+
+	if (mptcp_convert_tcp(net, kern, family, type, protocol))
+		protocol = IPPROTO_MPTCP;
 
 	err = security_socket_create(family, type, protocol, kern);
 	if (err)
