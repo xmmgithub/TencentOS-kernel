@@ -104,6 +104,7 @@ static int __mptcp_socket_create(struct mptcp_sock *msk)
 	subflow = mptcp_subflow_ctx(ssock->sk);
 	list_add(&subflow->node, &msk->conn_list);
 	subflow->request_mptcp = 1;
+	atomic_inc(&msk->subflow_count);
 
 	/* accept() will wait on first subflow sk_wq, and we always wakes up
 	 * via msk->sk_socket
@@ -1372,6 +1373,7 @@ static int __mptcp_recvmsg_mskq(struct mptcp_sock *msk,
 			break;
 	}
 
+	msk->copied_seq += copied;
 	return copied;
 }
 
@@ -1689,6 +1691,7 @@ void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 {
 	struct socket *sock = READ_ONCE(ssk->sk_socket);
 
+	atomic_dec(&mptcp_sk(sk)->subflow_count);
 	list_del(&subflow->node);
 
 	if (sock && sock != sk->sk_socket) {
@@ -1838,6 +1841,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	INIT_LIST_HEAD(&msk->conn_list);
 	INIT_LIST_HEAD(&msk->join_list);
 	INIT_LIST_HEAD(&msk->rtx_queue);
+	INIT_HLIST_NODE(&msk->all_list);
 	__set_bit(MPTCP_SEND_SPACE, &msk->flags);
 	INIT_WORK(&msk->work, mptcp_worker);
 	msk->out_of_order_queue = RB_ROOT;
@@ -2086,6 +2090,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 		msk->can_ack = true;
 		msk->remote_key = mp_opt->sndr_key;
 		mptcp_crypto_key_sha(msk->remote_key, NULL, &ack_seq);
+		WRITE_ONCE(msk->copied_seq, ack_seq);
 		ack_seq++;
 		WRITE_ONCE(msk->ack_seq, ack_seq);
 	}
@@ -2159,7 +2164,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		local_bh_disable();
 		bh_lock_sock(new_mptcp_sock);
 		msk = mptcp_sk(new_mptcp_sock);
-		msk->first = newsk;
+		clear_bit(MPTCP_UNACCEPTED, &msk->flags);
 
 		newsk = new_mptcp_sock;
 		mptcp_copy_inaddrs(newsk, ssk);
@@ -2191,6 +2196,7 @@ static void mptcp_destroy(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
+	sk->sk_prot->unhash(sk);
 	if (msk->cached_ext)
 		__skb_ext_put(msk->cached_ext);
 
@@ -2389,16 +2395,13 @@ static void mptcp_release_cb(struct sock *sk)
 
 static int mptcp_hash(struct sock *sk)
 {
-	/* should never be called,
-	 * we hash the TCP subflows not the master socket
-	 */
-	WARN_ON_ONCE(1);
+	mptcp_sk_add(sk);
 	return 0;
 }
 
 static void mptcp_unhash(struct sock *sk)
 {
-	/* called from sk_common_release(), but nothing to do here */
+	mptcp_sk_remove(sk);
 }
 
 static int mptcp_get_port(struct sock *sk, unsigned short snum)
@@ -2428,6 +2431,8 @@ void mptcp_finish_connect(struct sock *ssk)
 	pr_debug("msk=%p, token=%u", sk, subflow->token);
 
 	mptcp_crypto_key_sha(subflow->remote_key, NULL, &ack_seq);
+	WRITE_ONCE(msk->copied_seq, ack_seq);
+
 	ack_seq++;
 	subflow->map_seq = ack_seq;
 	subflow->map_subflow_seq = 1;
@@ -2486,6 +2491,7 @@ bool mptcp_finish_join(struct sock *sk)
 	if (ret && !WARN_ON_ONCE(!list_empty(&subflow->node)))
 		list_add_tail(&subflow->node, &msk->join_list);
 	spin_unlock_bh(&msk->join_list_lock);
+	atomic_inc(&msk->subflow_count);
 	if (!ret)
 		return false;
 
@@ -2589,6 +2595,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	mptcp_token_destroy(msk);
 	inet_sk_state_store(sock->sk, TCP_SYN_SENT);
+	sock->sk->sk_prot->hash(sock->sk);
 	subflow = mptcp_subflow_ctx(ssock->sk);
 #ifdef CONFIG_TCP_MD5SIG
 	/* no MPTCP if MD5SIG is enabled on this socket or we may run out of
@@ -2635,6 +2642,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	mptcp_token_destroy(msk);
 	inet_sk_state_store(sock->sk, TCP_LISTEN);
 	sock_set_flag(sock->sk, SOCK_RCU_FREE);
+	sock->sk->sk_prot->hash(sock->sk);
 
 	err = ssock->ops->listen(ssock, backlog);
 	inet_sk_state_store(sock->sk, inet_sk_state_load(ssock->sk));

@@ -34,6 +34,7 @@
 #include <net/netns/can.h>
 #include <net/netns/xdp.h>
 #include <net/netns/bpf.h>
+#include <net/netns/mptcp.h>
 #include <linux/ns_common.h>
 #include <linux/idr.h>
 #include <linux/skbuff.h>
@@ -121,6 +122,9 @@ struct net {
 	struct netns_unix	unx;
 	struct netns_nexthop	nexthop;
 	struct netns_ipv4	ipv4;
+#ifdef CONFIG_MPTCP
+	struct netns_mptcp	mptcp;
+#endif
 #if IS_ENABLED(CONFIG_IPV6)
 	struct netns_ipv6	ipv6;
 #endif

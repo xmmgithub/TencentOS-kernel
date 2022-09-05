@@ -588,6 +588,7 @@ create_child:
 			new_msk->sk_destruct = mptcp_sock_destruct;
 			mptcp_pm_new_connection(mptcp_sk(new_msk), 1);
 			mptcp_token_accept(subflow_req, mptcp_sk(new_msk));
+			new_msk->sk_prot->hash(new_msk);
 			ctx->conn = new_msk;
 			new_msk = NULL;
 
@@ -1137,6 +1138,7 @@ int __mptcp_subflow_connect(struct sock *sk, const struct mptcp_addr_info *loc,
 	spin_lock_bh(&msk->join_list_lock);
 	list_add_tail(&subflow->node, &msk->join_list);
 	spin_unlock_bh(&msk->join_list_lock);
+	atomic_inc(&msk->subflow_count);
 
 	return err;
 

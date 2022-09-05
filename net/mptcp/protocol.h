@@ -91,45 +91,9 @@
 #define MPTCP_WORK_EOF		3
 #define MPTCP_FALLBACK_DONE	4
 #define MPTCP_WORK_CLOSE_SUBFLOW 5
+#define MPTCP_UNACCEPTED	6
 
-struct mptcp_options_received {
-	u64	sndr_key;
-	u64	rcvr_key;
-	u64	data_ack;
-	u64	data_seq;
-	u32	subflow_seq;
-	u16	data_len;
-	u16	mp_capable : 1,
-		mp_join : 1,
-		dss : 1,
-		add_addr : 1,
-		rm_addr : 1,
-		family : 4,
-		echo : 1,
-		backup : 1;
-	u32	token;
-	u32	nonce;
-	u64	thmac;
-	u8	hmac[20];
-	u8	join_id;
-	u8	use_map:1,
-		dsn64:1,
-		data_fin:1,
-		use_ack:1,
-		ack64:1,
-		mpc_map:1,
-		__unused:2;
-	u8	addr_id;
-	u8	rm_id;
-	union {
-		struct in_addr	addr;
-#if IS_ENABLED(CONFIG_MPTCP_IPV6)
-		struct in6_addr	addr6;
-#endif
-	};
-	u64	ahmac;
-	u16	port;
-};
+struct mptcp_options_received;
 
 static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 {
@@ -201,10 +165,12 @@ struct mptcp_sock {
 	u64		remote_key;
 	u64		write_seq;
 	u64		ack_seq;
+	u64		copied_seq;
 	u64		rcv_data_fin_seq;
 	struct sock	*last_snd;
 	int		snd_burst;
 	atomic64_t	snd_una;
+	atomic_t	subflow_count;
 	unsigned long	timer_ival;
 	u32		token;
 	unsigned long	flags;
@@ -220,6 +186,7 @@ struct mptcp_sock {
 	struct list_head conn_list;
 	struct list_head rtx_queue;
 	struct list_head join_list;
+	struct hlist_node all_list;
 	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct sock	*first;
@@ -230,6 +197,7 @@ struct mptcp_sock {
 		u64	time;	/* start time of measurement window */
 		u64	rtt_us; /* last maximum rtt of subflows */
 	} rcvq_space;
+	struct mptcp_sock	*dl_next;
 };
 
 #define mptcp_for_each_subflow(__msk, __subflow)			\
@@ -238,6 +206,40 @@ struct mptcp_sock {
 static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 {
 	return (struct mptcp_sock *)sk;
+}
+
+static inline struct sock *mptcp_sk_next(const struct sock *sk)
+{
+	return (struct sock *)hlist_entry_safe(mptcp_sk(sk)->all_list.next,
+					       struct mptcp_sock,
+					       all_list);
+}
+
+static inline bool mptcp_sk_add(const struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct net *net = sock_net(sk);
+
+	if (!hlist_unhashed(&mptcp_sk(sk)->all_list))
+		return false;
+
+	mutex_lock(&net->packet.sklist_lock);
+	hlist_add_tail_rcu(&msk->all_list, &net->mptcp.sklist);
+	mutex_unlock(&net->packet.sklist_lock);
+	return true;
+}
+
+static inline bool mptcp_sk_remove(const struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (hlist_unhashed(&mptcp_sk(sk)->all_list))
+		return false;
+
+	mutex_lock(&sock_net(sk)->mptcp.sklist_lock);
+	hlist_del_init_rcu(&msk->all_list);
+	mutex_unlock(&sock_net(sk)->mptcp.sklist_lock);
+	return true;
 }
 
 static inline struct mptcp_data_frag *mptcp_rtx_tail(const struct sock *sk)
@@ -361,7 +363,6 @@ mptcp_subflow_get_mapped_dsn(const struct mptcp_subflow_context *subflow)
 	return subflow->map_seq + mptcp_subflow_get_map_offset(subflow);
 }
 
-int mptcp_is_enabled(struct net *net);
 void mptcp_subflow_fully_established(struct mptcp_subflow_context *subflow,
 				     struct mptcp_options_received *mp_opt);
 bool mptcp_subflow_data_available(struct sock *sk);

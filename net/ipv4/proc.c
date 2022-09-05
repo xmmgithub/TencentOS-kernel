@@ -485,7 +485,7 @@ static int netstat_seq_show(struct seq_file *seq, void *v)
 					     offsetof(struct ipstats_mib, syncp)));
 
 	seq_putc(seq, '\n');
-	mptcp_seq_show(seq);
+	mptcp_mib_seq_show(seq);
 	return 0;
 }
 

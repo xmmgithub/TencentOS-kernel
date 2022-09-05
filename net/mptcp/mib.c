@@ -52,7 +52,7 @@ bool mptcp_mib_alloc(struct net *net)
 	return true;
 }
 
-void mptcp_seq_show(struct seq_file *seq)
+void mptcp_mib_seq_show(struct seq_file *seq)
 {
 	struct net *net = seq->private;
 	int i;
