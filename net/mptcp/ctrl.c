@@ -21,6 +21,7 @@ struct mptcp_pernet {
 
 	int mptcp_enabled;
 	int tcp_enabled;
+	int dup_addr;
 };
 
 static struct mptcp_pernet *mptcp_get_pernet(struct net *net)
@@ -50,6 +51,12 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.mode = 0644,
 		.proc_handler = proc_dointvec,
 	},
+	{
+		.procname = "dup_addr",
+		.maxlen = sizeof(int),
+		.mode = 0644,
+		.proc_handler = proc_dointvec,
+	},
 	{}
 };
 
@@ -58,6 +65,11 @@ int mptcp_tcp_enabled(const struct net *net)
 	return mptcp_is_enabled(net) && mptcp_get_pernet(net)->tcp_enabled;
 }
 EXPORT_SYMBOL_GPL(mptcp_tcp_enabled);
+
+int mptcp_dup_addr_enabled(struct net *net)
+{
+	return mptcp_get_pernet(net)->dup_addr;
+}
 
 static void mptcp_pernet_set_defaults(struct mptcp_pernet *pernet)
 {
@@ -78,6 +90,7 @@ static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
 
 	table[0].data = &pernet->mptcp_enabled;
 	table[1].data = &pernet->tcp_enabled;
+	table[2].data = &pernet->dup_addr;
 
 	hdr = register_net_sysctl(net, MPTCP_SYSCTL_PATH, table);
 	if (!hdr)

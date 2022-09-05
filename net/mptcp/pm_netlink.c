@@ -111,7 +111,8 @@ static void remote_address(const struct sock_common *skc,
 }
 
 static bool lookup_subflow_by_saddr(const struct list_head *list,
-				    struct mptcp_addr_info *saddr)
+				    struct mptcp_addr_info *saddr,
+				    struct net *net)
 {
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_addr_info cur;
@@ -121,6 +122,13 @@ static bool lookup_subflow_by_saddr(const struct list_head *list,
 		skc = (struct sock_common *)mptcp_subflow_tcp_sock(subflow);
 
 		local_address(skc, &cur);
+		if (mptcp_dup_addr_enabled(net)) {
+			if (cur.id == saddr->id)
+				return true;
+			else
+				continue;
+		}
+
 		if (addresses_equal(&cur, saddr, false))
 			return true;
 	}
@@ -144,8 +152,10 @@ select_local_address(const struct pm_nl_pernet *pernet,
 		 * pending join
 		 */
 		if (entry->addr.family == ((struct sock *)msk)->sk_family &&
-		    !lookup_subflow_by_saddr(&msk->conn_list, &entry->addr) &&
-		    !lookup_subflow_by_saddr(&msk->join_list, &entry->addr)) {
+		    !lookup_subflow_by_saddr(&msk->conn_list, &entry->addr,
+		    			     sock_net((struct sock*)msk)) &&
+		    !lookup_subflow_by_saddr(&msk->join_list, &entry->addr,
+		    			     sock_net((struct sock*)msk))) {
 			ret = entry;
 			break;
 		}
@@ -779,7 +789,8 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 		}
 
 		lock_sock(sk);
-		remove_subflow = lookup_subflow_by_saddr(&msk->conn_list, addr);
+		remove_subflow = lookup_subflow_by_saddr(&msk->conn_list, addr,
+							 net);
 		mptcp_pm_remove_anno_addr(msk, addr, remove_subflow);
 		if (remove_subflow)
 			mptcp_pm_remove_subflow(msk, addr->id);
