@@ -199,6 +199,18 @@ config NF_CT_PROTO_UDPLITE
 
 	  If unsure, say Y.
 
+config NF_CT_PROTO_MPTCP
+	bool 'MPTCP protocol connection tracking support'
+	depends on MPTCP
+	depends on NETFILTER_ADVANCED
+	default y
+	help
+	  With this option enabled, the layer 3 independent connection
+	  tracking code will be able to do state tracking on MPTCP
+	  connections.
+
+	  If unsure, say Y.
+
 config NF_CONNTRACK_AMANDA
 	tristate "Amanda backup protocol support"
 	depends on NETFILTER_ADVANCED
@@ -412,6 +424,11 @@ config NF_NAT_FTP
 	tristate
 	depends on NF_CONNTRACK && NF_NAT
 	default NF_NAT && NF_CONNTRACK_FTP
+
+config NF_NAT_MPTCP
+	tristate
+	depends on NF_CT_PROTO_MPTCP && NF_NAT
+	default NF_NAT && NF_CT_PROTO_MPTCP
 
 config NF_NAT_IRC
 	tristate

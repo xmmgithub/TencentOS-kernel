@@ -31,6 +31,7 @@
 #include <net/netfilter/nf_conntrack_l4proto.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
 #include <net/netfilter/nf_conntrack_zones.h>
+#include <net/netfilter/nf_conntrack_mptcp.h>
 
 unsigned int nf_ct_expect_hsize __read_mostly;
 EXPORT_SYMBOL_GPL(nf_ct_expect_hsize);
@@ -52,6 +53,8 @@ void nf_ct_unlink_expect_report(struct nf_conntrack_expect *exp,
 
 	WARN_ON(!master_help);
 	WARN_ON(timer_pending(&exp->timeout));
+
+	nf_ct_expect_dec_mptcp(exp);
 
 	hlist_del_rcu(&exp->hnode);
 	net->ct.expect_count--;
@@ -391,6 +394,8 @@ static void nf_ct_expect_insert(struct nf_conntrack_expect *exp)
 	hlist_add_head_rcu(&exp->hnode, &nf_ct_expect_hash[h]);
 	net->ct.expect_count++;
 
+	nf_ct_expect_inc_mptcp(exp);
+
 	NF_CT_STAT_INC(net, expect_create);
 }
 
@@ -687,6 +692,9 @@ module_param_named(expect_hashsize, nf_ct_expect_hsize, uint, 0400);
 int nf_conntrack_expect_pernet_init(struct net *net)
 {
 	net->ct.expect_count = 0;
+#ifdef CONFIG_NF_CT_PROTO_MPTCP
+	net->ct.nf_ct_proto.tcp.mptcp_expect_count = 0;
+#endif
 	return exp_proc_init(net);
 }
 

@@ -50,6 +50,7 @@ void mptcp_crypto_key_sha(u64 key, u32 *token, u64 *idsn)
 	if (idsn)
 		*idsn = be64_to_cpu(*((__be64 *)&mptcp_hashed_key[6]));
 }
+EXPORT_SYMBOL(mptcp_crypto_key_sha);
 
 void mptcp_crypto_hmac_sha(u64 key1, u64 key2, u8 *msg, int len, void *hmac)
 {

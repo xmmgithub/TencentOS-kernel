@@ -27,6 +27,7 @@
 #include <net/netfilter/nf_conntrack_seqadj.h>
 #include <net/netfilter/nf_conntrack_synproxy.h>
 #include <net/netfilter/nf_conntrack_timeout.h>
+#include <net/netfilter/nf_conntrack_mptcp.h>
 #include <net/netfilter/nf_log.h>
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
@@ -95,16 +96,6 @@ static const unsigned int tcp_timeouts[TCP_CONNTRACK_TIMEOUT_MAX] = {
 #define sS2 TCP_CONNTRACK_SYN_SENT2
 #define sIV TCP_CONNTRACK_MAX
 #define sIG TCP_CONNTRACK_IGNORE
-
-/* What TCP flags are set from RST/SYN/FIN/ACK. */
-enum tcp_bit_set {
-	TCP_SYN_SET,
-	TCP_SYNACK_SET,
-	TCP_FIN_SET,
-	TCP_ACK_SET,
-	TCP_RST_SET,
-	TCP_NONE_SET,
-};
 
 /*
  * The TCP state transition table needs a few words...
@@ -279,15 +270,6 @@ static void tcp_print_conntrack(struct seq_file *s, struct nf_conn *ct)
 	seq_printf(s, "%s ", tcp_conntrack_names[ct->proto.tcp.state]);
 }
 #endif
-
-static unsigned int get_conntrack_index(const struct tcphdr *tcph)
-{
-	if (tcph->rst) return TCP_RST_SET;
-	else if (tcph->syn) return (tcph->ack ? TCP_SYNACK_SET : TCP_SYN_SET);
-	else if (tcph->fin) return TCP_FIN_SET;
-	else if (tcph->ack) return TCP_ACK_SET;
-	else return TCP_NONE_SET;
-}
 
 /* TCP connection tracking based on 'Real Stateful TCP Packet Filtering
    in IP Filter' by Guido van Rooij.
@@ -1101,6 +1083,7 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 		return -NF_ACCEPT;
 	}
      in_window:
+	nf_ct_mptcp_state(skb, dataoff, ct, index);
 	/* From now on we have got in-window packets */
 	ct->proto.tcp.last_index = index;
 	ct->proto.tcp.last_dir = dir;

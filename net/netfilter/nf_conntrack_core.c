@@ -48,6 +48,7 @@
 #include <net/netfilter/nf_conntrack_timeout.h>
 #include <net/netfilter/nf_conntrack_labels.h>
 #include <net/netfilter/nf_conntrack_synproxy.h>
+#include <net/netfilter/nf_conntrack_mptcp.h>
 #include <net/netfilter/nf_nat.h>
 #include <net/netfilter/nf_nat_helper.h>
 #include <net/netns/hash.h>
@@ -1434,14 +1435,15 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 	       struct sk_buff *skb,
 	       unsigned int dataoff, u32 hash)
 {
+	struct nf_conntrack_tuple repl_tuple, mptcp_tuple;
 	struct nf_conn *ct;
 	struct nf_conn_help *help;
-	struct nf_conntrack_tuple repl_tuple;
 	struct nf_conntrack_ecache *ecache;
 	struct nf_conntrack_expect *exp = NULL;
 	const struct nf_conntrack_zone *zone;
 	struct nf_conn_timeout *timeout_ext;
 	struct nf_conntrack_zone tmp;
+	int err;
 
 	if (!nf_ct_invert_tuple(&repl_tuple, tuple)) {
 		pr_debug("Can't invert tuple.\n");
@@ -1476,8 +1478,15 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 
 	local_bh_disable();
 	if (net->ct.expect_count) {
+		err = mptcp_token_to_tuple(net, skb, dataoff, tuple,
+					   &mptcp_tuple);
+
 		spin_lock(&nf_conntrack_expect_lock);
-		exp = nf_ct_find_expectation(net, zone, tuple);
+		if (!err)
+			exp = nf_ct_find_expectation(net, zone, &mptcp_tuple);
+		if (!exp)
+			exp = nf_ct_find_expectation(net, zone, tuple);
+
 		if (exp) {
 			pr_debug("expectation arrives ct=%p exp=%p\n",
 				 ct, exp);
@@ -2432,6 +2441,9 @@ static __always_inline unsigned int total_extension_size(void)
 #endif
 #if IS_ENABLED(CONFIG_NETFILTER_SYNPROXY)
 		+ sizeof(struct nf_conn_synproxy)
+#endif
+#ifdef CONFIG_NF_CT_PROTO_MPTCP
+		+ sizeof(struct nf_ct_mptcp_ext)
 #endif
 	;
 };

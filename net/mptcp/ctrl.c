@@ -30,6 +30,7 @@ int mptcp_is_enabled(struct net *net)
 {
 	return mptcp_get_pernet(net)->mptcp_enabled;
 }
+EXPORT_SYMBOL(mptcp_is_enabled);
 
 static struct ctl_table mptcp_sysctl_table[] = {
 	{

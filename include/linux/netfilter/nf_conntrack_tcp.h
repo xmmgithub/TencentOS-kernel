@@ -2,6 +2,7 @@
 #ifndef _NF_CONNTRACK_TCP_H
 #define _NF_CONNTRACK_TCP_H
 
+#include <uapi/linux/tcp.h>
 #include <uapi/linux/netfilter/nf_conntrack_tcp.h>
 
 
@@ -29,5 +30,24 @@ struct ip_ct_tcp {
 	u_int8_t	last_wscale;	/* Last window scaling factor seen */
 	u_int8_t	last_flags;	/* Last flags set */
 };
+
+/* What TCP flags are set from RST/SYN/FIN/ACK. */
+enum tcp_bit_set {
+	TCP_SYN_SET,
+	TCP_SYNACK_SET,
+	TCP_FIN_SET,
+	TCP_ACK_SET,
+	TCP_RST_SET,
+	TCP_NONE_SET,
+};
+
+static inline unsigned int get_conntrack_index(const struct tcphdr *tcph)
+{
+	if (tcph->rst) return TCP_RST_SET;
+	else if (tcph->syn) return (tcph->ack ? TCP_SYNACK_SET : TCP_SYN_SET);
+	else if (tcph->fin) return TCP_FIN_SET;
+	else if (tcph->ack) return TCP_ACK_SET;
+	else return TCP_NONE_SET;
+}
 
 #endif /* _NF_CONNTRACK_TCP_H */

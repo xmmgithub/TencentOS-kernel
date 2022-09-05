@@ -18,6 +18,7 @@
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/nf_conntrack_bridge.h>
 #include <net/netfilter/nf_log.h>
+#include <net/netfilter/nf_conntrack_mptcp.h>
 
 #include <linux/ip.h>
 #include <linux/icmp.h>
@@ -133,7 +134,7 @@ unsigned int nf_confirm(struct sk_buff *skb, unsigned int protoff,
 
 		/* rcu_read_lock()ed by nf_hook_thresh */
 		helper = rcu_dereference(help->helper);
-		if (helper) {
+		if (helper && helper->help) {
 			ret = helper->help(skb,
 					   protoff,
 					   ct, ctinfo);
@@ -679,6 +680,7 @@ void nf_conntrack_proto_pernet_init(struct net *net)
 	nf_conntrack_udp_init_net(net);
 	nf_conntrack_tcp_init_net(net);
 	nf_conntrack_icmp_init_net(net);
+	nf_conntrack_mptcp_init_net(net);
 #if IS_ENABLED(CONFIG_IPV6)
 	nf_conntrack_icmpv6_init_net(net);
 #endif

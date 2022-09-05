@@ -28,7 +28,9 @@ enum nf_ct_ext_id {
 #if IS_ENABLED(CONFIG_NETFILTER_SYNPROXY)
 	NF_CT_EXT_SYNPROXY,
 #endif
-	NF_CT_EXT_AGENT,
+#if IS_ENABLED(CONFIG_NF_CT_PROTO_MPTCP)
+	NF_CT_EXT_MPTCP,
+#endif
 	NF_CT_EXT_NUM,
 };
 
@@ -37,11 +39,11 @@ enum nf_ct_ext_id {
 #define NF_CT_EXT_SEQADJ_TYPE struct nf_conn_seqadj
 #define NF_CT_EXT_ACCT_TYPE struct nf_conn_acct
 #define NF_CT_EXT_ECACHE_TYPE struct nf_conntrack_ecache
-#define NF_CT_EXT_AGENT_TYPE struct nf_agent_stats
 #define NF_CT_EXT_TSTAMP_TYPE struct nf_conn_tstamp
 #define NF_CT_EXT_TIMEOUT_TYPE struct nf_conn_timeout
 #define NF_CT_EXT_LABELS_TYPE struct nf_conn_labels
 #define NF_CT_EXT_SYNPROXY_TYPE struct nf_conn_synproxy
+#define NF_CT_EXT_MPTCP_TYPE struct nf_ct_mptcp_ext
 
 /* Extensions: optional stuff which isn't permanently in struct. */
 struct nf_ct_ext {
@@ -54,6 +56,11 @@ struct nf_ct_ext {
 static inline bool __nf_ct_ext_exist(const struct nf_ct_ext *ext, u8 id)
 {
 	return !!ext->offset[id];
+}
+
+static inline void nf_ct_ext_clear(struct nf_ct_ext *ext, u8 id)
+{
+	ext->offset[id] = 0;
 }
 
 static inline bool nf_ct_ext_exist(const struct nf_conn *ct, u8 id)

@@ -14,6 +14,7 @@ nf_conntrack-$(CONFIG_NF_CONNTRACK_LABELS) += nf_conntrack_labels.o
 nf_conntrack-$(CONFIG_NF_CT_PROTO_DCCP) += nf_conntrack_proto_dccp.o
 nf_conntrack-$(CONFIG_NF_CT_PROTO_SCTP) += nf_conntrack_proto_sctp.o
 nf_conntrack-$(CONFIG_NF_CT_PROTO_GRE) += nf_conntrack_proto_gre.o
+nf_conntrack-$(CONFIG_NF_CT_PROTO_MPTCP) += nf_conntrack_proto_mptcp.o
 
 obj-$(CONFIG_NETFILTER) = netfilter.o
 
@@ -64,6 +65,7 @@ obj-$(CONFIG_NF_NAT_FTP) += nf_nat_ftp.o
 obj-$(CONFIG_NF_NAT_IRC) += nf_nat_irc.o
 obj-$(CONFIG_NF_NAT_SIP) += nf_nat_sip.o
 obj-$(CONFIG_NF_NAT_TFTP) += nf_nat_tftp.o
+obj-$(CONFIG_NF_NAT_MPTCP) += nf_nat_mptcp.o
 
 # SYNPROXY
 obj-$(CONFIG_NETFILTER_SYNPROXY) += nf_synproxy_core.o

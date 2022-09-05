@@ -18,7 +18,7 @@ static bool mptcp_cap_flag_sha256(u8 flags)
 	return (flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA256;
 }
 
-static void mptcp_parse_option(const struct sk_buff *skb,
+static void mptcp_parse_option(const struct sk_buff *skb, struct tcphdr *th,
 			       const unsigned char *ptr, int opsize,
 			       struct mptcp_options_received *mp_opt)
 {
@@ -30,13 +30,13 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 	switch (subtype) {
 	case MPTCPOPT_MP_CAPABLE:
 		/* strict size checking */
-		if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)) {
-			if (skb->len > tcp_hdr(skb)->doff << 2)
+		if (!th->syn) {
+			if (skb->len > th->doff << 2)
 				expected_opsize = TCPOLEN_MPTCP_MPC_ACK_DATA;
 			else
 				expected_opsize = TCPOLEN_MPTCP_MPC_ACK;
 		} else {
-			if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_ACK)
+			if (th->ack)
 				expected_opsize = TCPOLEN_MPTCP_MPC_SYNACK;
 			else
 				expected_opsize = TCPOLEN_MPTCP_MPC_SYN;
@@ -322,12 +322,14 @@ void mptcp_get_options(const struct sk_buff *skb,
 			if (opsize > length)
 				return;	/* don't parse partial options */
 			if (opcode == TCPOPT_MPTCP)
-				mptcp_parse_option(skb, ptr, opsize, mp_opt);
+				mptcp_parse_option(skb, th, ptr, opsize,
+						   mp_opt);
 			ptr += opsize - 2;
 			length -= opsize;
 		}
 	}
 }
+EXPORT_SYMBOL(mptcp_get_options);
 
 bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 		       unsigned int *size, struct mptcp_out_options *opts)

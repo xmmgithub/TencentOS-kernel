@@ -27,6 +27,9 @@ struct nf_tcp_net {
 	int tcp_loose;
 	int tcp_be_liberal;
 	int tcp_max_retrans;
+#ifdef CONFIG_NF_CT_PROTO_MPTCP
+	unsigned int mptcp_expect_count;
+#endif
 };
 
 enum udp_conntrack {

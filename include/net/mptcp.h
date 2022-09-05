@@ -12,6 +12,45 @@
 #include <linux/tcp.h>
 #include <linux/types.h>
 
+struct mptcp_options_received {
+	u64	sndr_key;
+	u64	rcvr_key;
+	u64	data_ack;
+	u64	data_seq;
+	u32	subflow_seq;
+	u16	data_len;
+	u16	mp_capable : 1,
+		mp_join : 1,
+		dss : 1,
+		add_addr : 1,
+		rm_addr : 1,
+		family : 4,
+		echo : 1,
+		backup : 1;
+	u32	token;
+	u32	nonce;
+	u64	thmac;
+	u8	hmac[20];
+	u8	join_id;
+	u8	use_map:1,
+		dsn64:1,
+		data_fin:1,
+		use_ack:1,
+		ack64:1,
+		mpc_map:1,
+		__unused:2;
+	u8	addr_id;
+	u8	rm_id;
+	union {
+		struct in_addr	addr;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+		struct in6_addr	addr6;
+#endif
+	};
+	u64	ahmac;
+	u16	port;
+};
+
 struct seq_file;
 
 /* MPTCP sk_buff extension data */
@@ -89,6 +128,9 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb);
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
+extern void
+mptcp_get_options(const struct sk_buff *skb,
+		  struct mptcp_options_received *mp_opt);
 
 /* move the skb extension owership, with the assumption that 'to' is
  * newly allocated
@@ -129,6 +171,8 @@ static inline bool mptcp_ext_matches(const struct mptcp_ext *to_ext,
 	        !memcmp(from_ext, to_ext, sizeof(struct mptcp_ext)));
 }
 
+int mptcp_is_enabled(struct net *net);
+
 /* check if skbs can be collapsed.
  * MPTCP collapse is allowed if neither @to or @from carry an mptcp data
  * mapping, or if the extension of @to is the same as @from.
@@ -145,6 +189,7 @@ void mptcp_seq_show(struct seq_file *seq);
 int mptcp_subflow_init_cookie_req(struct request_sock *req,
 				  const struct sock *sk_listener,
 				  struct sk_buff *skb);
+void mptcp_crypto_key_sha(u64 key, u32 *token, u64 *idsn);
 #else
 
 static inline void mptcp_init(void)
@@ -217,8 +262,13 @@ static inline bool mptcp_skb_can_collapse(const struct sk_buff *to,
 	return true;
 }
 
+static inline int mptcp_is_enabled(struct net *net)
+{
+	return false;
+}
+
 static inline void mptcp_space(const struct sock *ssk, int *s, int *fs) { }
-static inline void mptcp_seq_show(struct seq_file *seq) { }
+static inline void mptcp_mib_seq_show(struct seq_file *seq) { }
 
 static inline int mptcp_subflow_init_cookie_req(struct request_sock *req,
 						const struct sock *sk_listener,
@@ -230,6 +280,9 @@ static inline int mptcp_subflow_init_cookie_req(struct request_sock *req,
 static inline int mptcp_tcp_enabled(const struct net *net)
 {
 	return false;
+}
+static inline void mptcp_crypto_key_sha(u64 key, u32 *token, u64 *idsn)
+{
 }
 #endif /* CONFIG_MPTCP */
 

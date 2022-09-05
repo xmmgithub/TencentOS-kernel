@@ -449,7 +449,7 @@ static int ovs_ct_helper(struct sk_buff *skb, u16 proto)
 		return NF_ACCEPT;
 
 	helper = rcu_dereference(help->helper);
-	if (!helper)
+	if (!helper || !helper->help)
 		return NF_ACCEPT;
 
 	switch (proto) {
