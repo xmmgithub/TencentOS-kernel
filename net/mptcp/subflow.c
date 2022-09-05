@@ -434,29 +434,6 @@ static bool subflow_hmac_valid(const struct request_sock *req,
 	return !crypto_memneq(hmac, mp_opt->hmac, MPTCPOPT_HMAC_LEN);
 }
 
-static void mptcp_sock_destruct(struct sock *sk)
-{
-	/* if new mptcp socket isn't accepted, it is free'd
-	 * from the tcp listener sockets request queue, linked
-	 * from req->sk.  The tcp socket is released.
-	 * This calls the ULP release function which will
-	 * also remove the mptcp socket, via
-	 * sock_put(ctx->conn).
-	 *
-	 * Problem is that the mptcp socket will be in
-	 * ESTABLISHED state and will not have the SOCK_DEAD flag.
-	 * Both result in warnings from inet_sock_destruct.
-	 */
-	if ((1 << sk->sk_state) & (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
-		sk->sk_state = TCP_CLOSE;
-		WARN_ON_ONCE(sk->sk_socket);
-		sock_orphan(sk);
-	}
-
-	mptcp_destroy_common(mptcp_sk(sk));
-	inet_sock_destruct(sk);
-}
-
 static void mptcp_force_close(struct sock *sk)
 {
 	inet_sk_state_store(sk, TCP_CLOSE);
@@ -546,6 +523,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 		new_msk = mptcp_sk_clone(listener->conn, &mp_opt, req);
 		if (!new_msk)
 			fallback = true;
+		set_bit(MPTCP_UNACCEPTED, &mptcp_sk(new_msk)->flags);
 	} else if (subflow_req->mp_join) {
 		mptcp_get_options(skb, &mp_opt);
 		if (!mp_opt.mp_join || !subflow_hmac_valid(req, &mp_opt) ||
@@ -582,10 +560,14 @@ create_child:
 			 */
 			inet_sk_state_store((void *)new_msk, TCP_ESTABLISHED);
 
+			/* record the newly created socket as the first msk
+			 * subflow, but don't link it yet into conn_list
+			 */
+			WRITE_ONCE(mptcp_sk(new_msk)->first, child);
+
 			/* new mpc subflow takes ownership of the newly
 			 * created mptcp socket
 			 */
-			new_msk->sk_destruct = mptcp_sock_destruct;
 			mptcp_pm_new_connection(mptcp_sk(new_msk), 1);
 			mptcp_token_accept(subflow_req, mptcp_sk(new_msk));
 			new_msk->sk_prot->hash(new_msk);
@@ -1311,12 +1293,21 @@ out:
 static void subflow_ulp_release(struct sock *sk)
 {
 	struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(sk);
+	struct mptcp_sock *msk;
+	struct sock *ssk;
 
 	if (!ctx)
 		return;
 
-	if (ctx->conn)
-		sock_put(ctx->conn);
+	ssk = ctx->conn;
+	if (ssk) {
+		msk = mptcp_sk(ssk);
+		if (msk->first == sk && test_and_clear_bit(MPTCP_UNACCEPTED,
+							   &msk->flags))
+			ssk->sk_prot->close(ssk, 0);
+		else
+			sock_put(ssk);
+	}
 
 	kfree_rcu(ctx, rcu);
 }
