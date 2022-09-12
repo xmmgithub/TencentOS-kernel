@@ -43,6 +43,10 @@ int __mptcp_token_to_tuple(struct sk_buff *skb, unsigned int dataoff,
 	skb_pull(skb, dataoff);
 	mptcp_get_options(skb, &options);
 	skb_push(skb, dataoff);
+
+	pr_debug("lookup expect, token: %u, ip: %u\n", options.token,
+		 tuple->dst.u3.ip);
+
 	if (!options.mp_join)
 		goto err;
 
@@ -90,8 +94,12 @@ mptcp_setup_expect(struct sk_buff *skb, struct nf_conn *ct)
 	exp->flags = NF_CT_EXPECT_PERMANENT;
 
 	err = nf_ct_expect_related(exp, 0);
-	if (err)
+	if (err) {
+		pr_debug("failed to insert expect\n");
 		return -EINVAL;
+	}
+	pr_debug("inserted expect: token: %u, ip: %u\n", token,
+		 tuple->dst.u3.ip);
 
 	return 0;
 }
@@ -144,6 +152,9 @@ int nf_ct_mptcp_state(struct sk_buff *skb, unsigned int dataoff,
 	skb_pull(skb, dataoff);
 	mptcp_get_options(skb, &options);
 	skb_push(skb, dataoff);
+
+	pr_debug("mptcp ct state: index: %d, is_mptcp: %d\n", index,
+		 nf_ct_is_mptcp(ct));
 
 	if (!options.mp_capable) {
 		if (index == TCP_SYN_SENT)

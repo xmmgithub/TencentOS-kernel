@@ -193,6 +193,7 @@ void mptcp_token_accept(struct mptcp_subflow_request_sock *req,
 	struct mptcp_subflow_request_sock *pos;
 	struct token_bucket *bucket;
 
+	pr_debug("add init conn with token: %u\n", req->token);
 	bucket = token_bucket(req->token);
 	spin_lock_bh(&bucket->lock);
 
